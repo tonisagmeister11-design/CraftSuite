@@ -1,0 +1,35 @@
+CraftSuite: FilmCraft und EffectCraft in einer App
+===================================================
+
+Starten
+-------
+Doppelklick auf CraftSuite.exe. Es erscheint ein Fenster mit beiden Apps:
+
+  FilmCraft    Videoschnitt, Farbe und Ton (wie Premiere Pro)
+  EffectCraft  Motion Graphics und visuelle Effekte (wie After Effects)
+
+Klicke eine an (oder drücke 1 bzw. 2), dann startet sie und das Fenster schließt sich.
+
+Tipp: Zieh eine Projektdatei auf CraftSuite.exe, dann startet direkt die passende App
+(.fcproj -> FilmCraft, .ecproj -> EffectCraft).
+
+Windows-Warnung ("Der Computer wurde durch Windows geschützt")
+--------------------------------------------------------------
+CraftSuite ist nicht digital signiert. Klicke auf "Weitere Informationen" und dann auf
+"Trotzdem ausführen".
+
+Was steckt drin?
+----------------
+In den Ordnern FilmCraft\ und EffectCraft\ liegen die Original-Apps, unverändert aus dem
+Quellcode gebaut, mit allen Funktionen. Sie lassen sich auch direkt starten. Daneben liegen
+jeweils die Kommandozeilen-Tools (filmcraft-cli.exe, effectcraft-cli.exe, auch als MCP-Server).
+
+Einstellungen und Projekte speichern beide Apps wie gewohnt in %APPDATA%.
+
+Lizenzen
+--------
+FilmCraft und EffectCraft: (c) The FilmCraft / EffectCraft contributors (ArtCraft),
+MIT OR Apache-2.0. https://github.com/storytold/filmcraft und
+https://github.com/storytold/effectcraft. Die Lizenztexte liegen in den beiden Ordnern.
+CraftSuite (das Startfenster): MIT OR Apache-2.0.
+CraftSuite ist ein unabhängiges Projekt und nicht mit ArtCraft oder Adobe verbunden.

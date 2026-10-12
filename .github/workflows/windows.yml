@@ -144,5 +144,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "dist/${{ steps.zip.outputs.name }}.zip" \
-            --repo "$GITHUB_REPOSITORY" --title "CraftSuite $GITHUB_REF_NAME" --generate-notes
+          zip="dist/${{ steps.zip.outputs.name }}.zip"
+          # A release created on github.com (which also creates the tag) just gets the file attached.
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$zip" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$zip" --repo "$GITHUB_REPOSITORY" \
+              --title "CraftSuite $GITHUB_REF_NAME" --generate-notes
+          fi

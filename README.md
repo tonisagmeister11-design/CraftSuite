@@ -21,18 +21,26 @@ Beim Start von CraftSuite erscheint ein Auswahlfenster mit beiden Apps. Ein Klic
 | **FilmCraft** | Videoschnitt, Farbkorrektur und Ton, aufgebaut wie Adobe Premiere Pro | 0.6.0 |
 | **EffectCraft** | Motion Graphics und visuelle Effekte, aufgebaut wie Adobe After Effects | 0.8.0 |
 
-Beide Apps sind die **unveränderten Originale**, aus ihrem Quellcode gebaut. Sie haben deshalb alle
-ihre Funktionen eins zu eins, einschließlich der Kommandozeilen-Tools und MCP-Server.
+Beide Apps sind die Originale, aus ihrem Quellcode gebaut, mit allen ihren Funktionen eins zu eins,
+einschließlich der Kommandozeilen-Tools und MCP-Server. CraftSuite ergänzt nur kleine Verbesserungen,
+die als Patch-Dateien in `patches/` liegen und beim Bauen angewendet werden:
+
+| Patch | Was er ändert |
+|---|---|
+| `patches/filmcraft/0001-…` | Nach dem Export erscheint „Export abgeschlossen“ mit dem Speicherort und „Im Ordner zeigen“ (vorher gab es nur einen kleinen Fortschrittsbalken, der wortlos verschwand). Standard-Speicherort unter Windows ist der Videos-Ordner statt des Benutzerordners. |
 
 ## Installieren (Windows)
 
-1. Unter [Releases](../../releases) (oder im letzten Lauf unter [Actions](../../actions)) die Datei
-   `CraftSuite-…-windows-x64.zip` herunterladen.
-2. Entpacken, zum Beispiel nach `C:\Programme\CraftSuite` oder auf den Desktop.
-3. `CraftSuite.exe` doppelklicken. Bei der Windows-Warnung „Weitere Informationen“ und dann
-   „Trotzdem ausführen“ wählen (die Dateien sind nicht digital signiert).
+1. Unter [Releases](../../releases) (oder im letzten Lauf unter [Actions](../../actions) bei
+   „Artifacts“) **`CraftSuite-Setup-….exe`** herunterladen.
+2. Doppelklicken und durchklicken. CraftSuite wird **nur für deinen Benutzer** installiert
+   (`%LOCALAPPDATA%\Programs\CraftSuite`): **kein Admin-Passwort, keine PIN**. Danach steht es im
+   Startmenü (auf Wunsch auch auf dem Desktop), und `.fcproj`-/`.ecproj`-Dateien öffnen sich per
+   Doppelklick in der richtigen App.
+3. Bei der Windows-Warnung „Weitere Informationen“ und dann „Trotzdem ausführen“ wählen (die Dateien
+   sind nicht digital signiert).
 
-Für eine Verknüpfung im Startmenü: Rechtsklick auf `CraftSuite.exe` und dann „An Start anheften“.
+Alternativ gibt es eine **Portable-Version** zum Entpacken und Starten, ganz ohne Installation.
 
 ## Bedienung
 
@@ -63,6 +71,8 @@ Im Repository:
 | `src/main.rs` | das Startfenster (Rust, egui) |
 | `vendor/filmcraft` | FilmCraft als Git-Submodul, festgelegt auf `v0.6.0` |
 | `vendor/effectcraft` | EffectCraft als Git-Submodul, festgelegt auf `v0.8.0` |
+| `patches/` | kleine Verbesserungen an den Apps, beim Bauen angewendet |
+| `installer/CraftSuite.iss` | der Installer (Inno Setup, pro Benutzer, ohne Admin) |
 | `packaging/assemble.sh` | baut den fertigen Ordner aus den drei Programmen zusammen |
 | `.github/workflows/windows.yml` | baut alles für Windows und erstellt das ZIP |
 

@@ -1,0 +1,110 @@
+FilmCraft: Meldung nach dem Export (mit "Im Ordner zeigen") und der Videos-Ordner als
+Standard-Speicherort unter Windows. Wird beim Bauen auf vendor/filmcraft angewendet.
+
+diff --git a/crates/engine/src/export_tools.rs b/crates/engine/src/export_tools.rs
+index b714e28..9ddc270 100644
+--- a/crates/engine/src/export_tools.rs
++++ b/crates/engine/src/export_tools.rs
+@@ -344,8 +344,9 @@ pub fn default_export_dir(s: &Session) -> PathBuf {
+         return PathBuf::from("/exports");
+     }
+     if let Some(h) = crate::media_browser::std_home_dir() {
+-        let movies = Path::new(&h).join("Movies");
+-        return if movies.is_dir() { movies } else { PathBuf::from(h) };
++        // The user's video folder: "Movies" on macOS, "Videos" on Windows and most Linux desktops.
++        let movies = ["Movies", "Videos"].iter().map(|d| Path::new(&h).join(d)).find(|d| d.is_dir());
++        return movies.unwrap_or_else(|| PathBuf::from(h));
+     }
+     crate::temp_dir()
+ }
+diff --git a/crates/ui-egui/src/lib.rs b/crates/ui-egui/src/lib.rs
+index 9c4c526..0d8bdc9 100644
+--- a/crates/ui-egui/src/lib.rs
++++ b/crates/ui-egui/src/lib.rs
+@@ -1694,6 +1694,7 @@ impl FilmcraftApp {
+                 self.play(1.0);
+             }
+         }
++        self.watch_exports(ctx);
+         let job = running?;
+         if job.label.starts_with("Rendering ") && !job.label.contains("audio") && self.watched_render.is_none_or(|w| w.0 != job.id) {
+             let from = self.session.active_sequence().and_then(|q| q.mark_in).unwrap_or(Tick::ZERO);
+@@ -1703,6 +1704,78 @@ impl FilmcraftApp {
+         Some(job)
+     }
+ 
++    /// When an export finishes, says so and where the file is (with "Show in folder"); when it
++    /// fails, shows the error. Without this the only sign was the status bar's progress vanishing.
++    fn watch_exports(&mut self, ctx: &egui::Context) {
++        use std::sync::atomic::Ordering;
++        type Notice = (String, Option<String>);
++        let running_id = egui::Id::new("export-notice-running");
++        let notice_id = egui::Id::new("export-notice");
++        let mut running: Vec<u64> = ctx.data_mut(|d| d.get_temp(running_id)).unwrap_or_default();
++        let mut notice: Option<Notice> = ctx.data_mut(|d| d.get_temp(notice_id));
++        for j in self.session.jobs.iter().filter(|j| j.label.starts_with("Export ")) {
++            if !j.progress.finished.load(Ordering::Relaxed) {
++                if !running.contains(&j.id) {
++                    running.push(j.id);
++                }
++                continue;
++            }
++            let Some(pos) = running.iter().position(|id| *id == j.id) else { continue };
++            let result = j.result.lock().unwrap_or_else(|e| e.into_inner()).clone();
++            match result {
++                Some(Ok(report)) => notice = Some((report.path, None)),
++                Some(Err(e)) if e.to_lowercase().contains("cancel") => {}
++                Some(Err(e)) => notice = Some((String::new(), Some(e))),
++                // Finished but the result is not stored yet: look again next frame.
++                None => continue,
++            }
++            running.remove(pos);
++        }
++        ctx.data_mut(|d| d.insert_temp(running_id, running));
++        let Some((path, error)) = notice else { return };
++        let (mut close, mut reveal) = (false, false);
++        let title = if error.is_none() { "Export abgeschlossen" } else { "Export fehlgeschlagen" };
++        egui::Window::new(title)
++            .id(egui::Id::new("export-notice-window"))
++            .collapsible(false)
++            .resizable(false)
++            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
++            .show(ctx, |ui| {
++                match &error {
++                    None => {
++                        ui.label("Das Video wurde gespeichert unter:");
++                        ui.add_space(4.0);
++                        ui.monospace(&path);
++                        ui.add_space(8.0);
++                        ui.horizontal(|ui| {
++                            if ui.button("Im Ordner zeigen").clicked() {
++                                reveal = true;
++                                close = true;
++                            }
++                            if ui.button("OK").clicked() {
++                                close = true;
++                            }
++                        });
++                    }
++                    Some(e) => {
++                        ui.label(e.as_str());
++                        ui.add_space(8.0);
++                        if ui.button("OK").clicked() {
++                            close = true;
++                        }
++                    }
++                }
++            });
++        if reveal && let Err(e) = panels::menu_dialogs::open_path(self, ctx, &path, true) {
++            self.ui.status = e;
++        }
++        if close {
++            ctx.data_mut(|d| d.remove::<Notice>(notice_id));
++        } else {
++            ctx.data_mut(|d| d.insert_temp(notice_id, (path, error)));
++        }
++    }
++
+     /// Right side of the status bar: the running job (export / render previews) with a progress
+     /// bar and a cancel button.
+     fn job_status(&mut self, ui: &mut egui::Ui, sb: egui::Rect, t: &Tokens) {

@@ -2,8 +2,9 @@ name: Windows
 
 # Builds CraftSuite for Windows x64: the start window plus FilmCraft and EffectCraft from the
 # pinned submodules, each with its own lockfile, exactly as their own release builds do.
-# Every run uploads CraftSuite-<version>-windows-x64.zip as an artifact; a pushed tag v*
-# also publishes it as a GitHub release.
+# Every run uploads CraftSuite-Setup-<version>.exe (per-user installer, no admin rights) and a
+# portable folder as artifacts; a pushed tag v* (or a release created on github.com) also
+# publishes them as a GitHub release.
 
 on:
   push:
@@ -38,6 +39,15 @@ jobs:
       - name: Check out ${{ matrix.app }}
         shell: bash
         run: git submodule update --init --depth 1 "vendor/${{ matrix.app }}"
+      # CraftSuite's own small fixes (patches/<app>/*.patch), applied on top of the pinned release.
+      - name: Apply patches
+        shell: bash
+        run: |
+          shopt -s nullglob
+          for p in patches/${{ matrix.app }}/*.patch; do
+            echo "applying $p"
+            git -C "vendor/${{ matrix.app }}" apply --whitespace=nowarn "$GITHUB_WORKSPACE/$p"
+          done
       # FilmCraft's release build embeds these fonts (Japanese UI); same pin as its release.yml.
       - if: matrix.app == 'filmcraft'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -105,9 +115,9 @@ jobs:
           if-no-files-found: error
 
   package:
-    name: Package
+    name: Package (installer + portable)
     needs: [app, launcher]
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     permissions:
       contents: write
     steps:
@@ -124,31 +134,53 @@ jobs:
         with:
           pattern: bin-*
           path: bin
-      - name: Assemble and zip
-        id: zip
+      - name: Assemble
+        id: version
+        shell: bash
         run: |
           version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
-          name="CraftSuite-$version-windows-x64"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="${GITHUB_REF_NAME#v}"; fi
           CRAFT_FONTS_DIR="$PWD/craft-fonts" packaging/assemble.sh "dist/CraftSuite" \
             bin/bin-launcher/craftsuite.exe bin/bin-filmcraft bin/bin-effectcraft .exe
-          (cd dist && zip -qr9 "$name.zip" CraftSuite)
-          ls -la dist
-          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Installer
+        shell: pwsh
+        run: |
+          $iscc = Get-Command iscc -ErrorAction SilentlyContinue
+          if (-not $iscc) {
+            $candidate = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+            if (-not (Test-Path $candidate)) { choco install innosetup -y --no-progress | Out-Null }
+            $iscc = Get-Item $candidate
+          }
+          & $iscc.Source /Qp "/DAppVersion=${{ steps.version.outputs.version }}" installer/CraftSuite.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
+      - name: Portable zip
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist/CraftSuite -DestinationPath "dist/CraftSuite-${{ steps.version.outputs.version }}-portable.zip"
+          Get-ChildItem dist -File | Format-Table Name, Length
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ${{ steps.zip.outputs.name }}
+          name: CraftSuite-Setup-${{ steps.version.outputs.version }}
+          path: dist/CraftSuite-Setup-*.exe
+          if-no-files-found: error
+          compression-level: 0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: CraftSuite-${{ steps.version.outputs.version }}-portable
           path: dist/CraftSuite
           if-no-files-found: error
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          zip="dist/${{ steps.zip.outputs.name }}.zip"
-          # A release created on github.com (which also creates the tag) just gets the file attached.
+          files=(dist/CraftSuite-Setup-*.exe dist/CraftSuite-*-portable.zip)
+          # A release created on github.com (which also creates the tag) just gets the files attached.
           if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "$zip" --repo "$GITHUB_REPOSITORY" --clobber
+            gh release upload "$GITHUB_REF_NAME" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" "$zip" --repo "$GITHUB_REPOSITORY" \
+            gh release create "$GITHUB_REF_NAME" "${files[@]}" --repo "$GITHUB_REPOSITORY" \
               --title "CraftSuite $GITHUB_REF_NAME" --generate-notes
           fi

@@ -3,7 +3,7 @@ CraftSuite: FilmCraft und EffectCraft in einer App
 
 Starten
 -------
-Doppelklick auf CraftSuite.exe. Es erscheint ein Fenster mit beiden Apps:
+Nach der Installation: CraftSuite im Startmenü. Portable-Version: Doppelklick auf CraftSuite.exe. Es erscheint ein Fenster mit beiden Apps:
 
   FilmCraft    Videoschnitt, Farbe und Ton (wie Premiere Pro)
   EffectCraft  Motion Graphics und visuelle Effekte (wie After Effects)
@@ -20,8 +20,9 @@ CraftSuite ist nicht digital signiert. Klicke auf "Weitere Informationen" und da
 
 Was steckt drin?
 ----------------
-In den Ordnern FilmCraft\ und EffectCraft\ liegen die Original-Apps, unverändert aus dem
-Quellcode gebaut, mit allen Funktionen. Sie lassen sich auch direkt starten. Daneben liegen
+In den Ordnern FilmCraft\ und EffectCraft\ liegen die Original-Apps, aus dem Quellcode gebaut,
+mit allen Funktionen. FilmCraft zeigt zusätzlich nach dem Export an, wo die Datei gespeichert
+wurde (Standard: dein Videos-Ordner). Sie lassen sich auch direkt starten. Daneben liegen
 jeweils die Kommandozeilen-Tools (filmcraft-cli.exe, effectcraft-cli.exe, auch als MCP-Server).
 
 Einstellungen und Projekte speichern beide Apps wie gewohnt in %APPDATA%.

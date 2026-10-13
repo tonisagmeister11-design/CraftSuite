@@ -638,11 +638,12 @@ dependencies = [
 
 [[package]]
 name = "craftsuite"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "eframe",
  "egui",
  "image",
+ "windows-sys 0.61.2",
  "winresource",
 ]
 

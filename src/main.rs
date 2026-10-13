@@ -1,7 +1,8 @@
 //! CraftSuite: ein Startfenster für FilmCraft und EffectCraft.
 //!
-//! Beim Start zeigt CraftSuite beide Apps zur Auswahl; ein Klick startet die gewählte App und
-//! schließt das Fenster. Die Apps selbst sind die unveränderten Originale, die neben
+//! Beim Start zeigt CraftSuite beide Apps zur Auswahl; ein Klick startet die gewählte App. Das
+//! Fenster bleibt offen, bis deren Fenster wirklich steht, und startet sie bei einem Absturz
+//! beim Start automatisch neu (siehe [`starter`]). Die Apps selbst sind die unveränderten Originale, die neben
 //! `CraftSuite.exe` in `FilmCraft/` und `EffectCraft/` liegen, daher haben sie alle ihre
 //! Funktionen eins zu eins.
 //!
@@ -12,10 +13,11 @@
 
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
+mod starter;
+
 use egui::{Align2, Color32, CornerRadius, FontId, Key, Rect, Sense, Stroke, StrokeKind, TextureHandle, vec2};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 const BG: Color32 = Color32::from_rgb(0x15, 0x13, 0x1b);
 const CARD: Color32 = Color32::from_rgb(0x21, 0x1e, 0x2a);
@@ -108,19 +110,10 @@ fn exe_path(choice: Choice) -> PathBuf {
     dir.join(info.folder).join(format!("{}{}", info.exe, std::env::consts::EXE_SUFFIX))
 }
 
-/// Starts the app as its own process, passing `args` through, and returns once it is running.
-fn launch(choice: Choice, args: &[OsString]) -> Result<(), String> {
+/// Starts the app as its own process (with `args`) and watches it until its window is up.
+fn launch(choice: Choice, args: &[OsString]) -> Result<starter::Starter, String> {
     let info = choice.info();
-    let exe = exe_path(choice);
-    if !exe.is_file() {
-        return Err(format!("{} wurde nicht gefunden:\n{}", info.name, exe.display()));
-    }
-    let mut cmd = Command::new(&exe);
-    cmd.args(args);
-    if let Some(dir) = exe.parent() {
-        cmd.current_dir(dir);
-    }
-    cmd.spawn().map(drop).map_err(|e| format!("{} konnte nicht gestartet werden:\n{e}", info.name))
+    starter::Starter::start(info.name, info.exe, exe_path(choice), args.to_vec())
 }
 
 /// Command line: an explicit `--filmcraft` / `--effectcraft`, or the app a project file belongs to.
@@ -168,6 +161,53 @@ struct Picker {
     selected: Choice,
     args: Vec<OsString>,
     error: Option<String>,
+    /// The app being started, watched on a background thread until its window is up.
+    starting: Option<(Choice, std::sync::Arc<std::sync::Mutex<StartState>>)>,
+}
+
+/// What the watcher thread reports to the window.
+#[derive(Default)]
+struct StartState {
+    status: String,
+    failed: Option<String>,
+}
+
+/// Watches a start on its own thread: the window may be covered by the new app (and then gets no
+/// frames), so the watching can't depend on it. Once the app is up, CraftSuite exits; the app
+/// keeps running.
+fn watch_in_background(ctx: egui::Context, name: &'static str, mut starter: starter::Starter, state: std::sync::Arc<std::sync::Mutex<StartState>>) {
+    std::thread::spawn(move || {
+        loop {
+            match starter.poll() {
+                starter::Progress::Starting { attempt, of, backend } => {
+                    let status = if attempt == 1 {
+                        format!("{name} wird gestartet …")
+                    } else {
+                        format!("{name} wird erneut gestartet … (Versuch {attempt} von {of}, Grafik: {})", starter::backend_label(backend.as_deref()))
+                    };
+                    if let Ok(mut s) = state.lock() {
+                        if s.status != status {
+                            s.status = status;
+                            ctx.request_repaint();
+                        }
+                    }
+                }
+                starter::Progress::Done => {
+                    starter.detach();
+                    std::process::exit(0);
+                }
+                starter::Progress::Failed(report) => {
+                    if let Ok(mut s) = state.lock() {
+                        s.failed = Some(report);
+                    }
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+                    ctx.request_repaint();
+                    return;
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(150));
+        }
+    });
 }
 
 impl Picker {
@@ -179,14 +219,47 @@ impl Picker {
             let size = [image.width() as usize, image.height() as usize];
             ctx.load_texture(info.name, egui::ColorImage::from_rgba_unmultiplied(size, image.as_raw()), egui::TextureOptions::LINEAR)
         };
-        Picker { icons: [icon(&FILM), icon(&EFFECT)], selected: Choice::Film, args, error }
+        Picker { icons: [icon(&FILM), icon(&EFFECT)], selected: Choice::Film, args, error, starting: None }
     }
 
     fn start(&mut self, ctx: &egui::Context, choice: Choice) {
+        self.error = None;
         match launch(choice, &self.args) {
-            Ok(()) => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+            Ok(starter) => {
+                self.selected = choice;
+                let name = choice.info().name;
+                let state = std::sync::Arc::new(std::sync::Mutex::new(StartState { status: format!("{name} wird gestartet …"), failed: None }));
+                watch_in_background(ctx.clone(), name, starter, state.clone());
+                self.starting = Some((choice, state));
+            }
             Err(e) => self.error = Some(e),
         }
+    }
+
+    /// A failed start goes back to the cards with the error.
+    fn watch_start(&mut self) {
+        let failed = self.starting.as_ref().and_then(|(_, st)| st.lock().ok().and_then(|mut s| s.failed.take()));
+        if let Some(report) = failed {
+            self.starting = None;
+            self.error = Some(report);
+        }
+    }
+
+    /// While an app starts: its icon, the status line and a spinner instead of the cards.
+    fn starting_view(&self, ui: &mut egui::Ui, full: Rect, choice: Choice, status: &str) {
+        let index = Choice::ALL.iter().position(|c| *c == choice).unwrap_or(0);
+        let icon = Rect::from_center_size(egui::pos2(full.center().x, full.top() + 210.0), vec2(150.0, 150.0));
+        ui.painter().image(self.icons[index].id(), icon, Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)), Color32::WHITE);
+        let spin = Rect::from_center_size(egui::pos2(full.center().x, icon.bottom() + 46.0), vec2(28.0, 28.0));
+        ui.put(spin, egui::Spinner::new().size(28.0).color(choice.info().accent));
+        ui.painter().text(egui::pos2(full.center().x, spin.bottom() + 22.0), Align2::CENTER_TOP, status, FontId::proportional(15.0), TEXT);
+        ui.painter().text(
+            egui::pos2(full.center().x, spin.bottom() + 50.0),
+            Align2::CENTER_TOP,
+            "Das Fenster schließt sich, sobald die App bereit ist.",
+            FontId::proportional(12.5),
+            MUTED,
+        );
     }
 
     /// One app's card; returns true when it was clicked.
@@ -240,6 +313,21 @@ impl Picker {
 impl eframe::App for Picker {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        self.watch_start();
+        if let Some((choice, state)) = self.starting.as_ref().map(|(c, st)| (*c, st.clone())) {
+            if ctx.input(|i| i.key_pressed(Key::Escape)) {
+                // Stop waiting; the app itself keeps starting.
+                std::process::exit(0);
+            }
+            let status = state.lock().map(|s| s.status.clone()).unwrap_or_default();
+            egui::CentralPanel::default().frame(egui::Frame::NONE.fill(BG)).show(ui, |ui| {
+                let full = ui.max_rect();
+                ui.painter().text(full.center_top() + vec2(0.0, 30.0), Align2::CENTER_TOP, "CraftSuite", FontId::proportional(30.0), TEXT);
+                self.starting_view(ui, full, choice, &status);
+            });
+            ctx.request_repaint_after(std::time::Duration::from_millis(250));
+            return;
+        }
         let (left, right, enter, escape, one, two) = ctx.input(|i| {
             (
                 i.key_pressed(Key::ArrowLeft),
@@ -284,7 +372,10 @@ impl eframe::App for Picker {
 
             let footer = egui::pos2(full.center().x, full.bottom() - 26.0);
             if let Some(error) = &self.error {
-                ui.painter().text(footer - vec2(0.0, 10.0), Align2::CENTER_BOTTOM, error, FontId::proportional(13.0), Color32::from_rgb(0xff, 0x6b, 0x6b));
+                let first = error.lines().next().unwrap_or_default();
+                let more = error.lines().skip(1).collect::<Vec<_>>().join("  ·  ");
+                ui.painter().text(footer - vec2(0.0, 12.0), Align2::CENTER_BOTTOM, first, FontId::proportional(13.0), Color32::from_rgb(0xff, 0x6b, 0x6b));
+                ui.painter().text(footer + vec2(0.0, 4.0), Align2::CENTER_BOTTOM, more, FontId::proportional(11.0), MUTED);
             } else {
                 let hint = if self.args.is_empty() { "Klicken, 1 / 2 drücken oder Pfeiltasten und Enter · Esc beendet" } else { "Die übergebenen Dateien werden in der gewählten App geöffnet · Esc beendet" };
                 ui.painter().text(footer, Align2::CENTER_CENTER, hint, FontId::proportional(12.5), MUTED);
@@ -292,7 +383,6 @@ impl eframe::App for Picker {
         });
 
         if let Some(choice) = chosen {
-            self.selected = choice;
             self.start(&ctx, choice);
         }
     }
@@ -306,16 +396,9 @@ fn main() -> eframe::Result {
             return Ok(());
         }
     };
-    // The app is known from the command line: start it without showing the picker. If that
-    // fails, the picker opens with the error so the user can see what went wrong.
-    let mut error = None;
-    if let Some(choice) = launch_args.choice {
-        match launch(choice, &launch_args.args) {
-            Ok(()) => return Ok(()),
-            Err(e) => error = Some(e),
-        }
-    }
-
+    // The app is known from the command line: the window opens straight into "starting", so a
+    // crash at start is retried there too, and an error stays visible.
+    let start_with = launch_args.choice;
     let icon = eframe::icon_data::from_png_bytes(include_bytes!("../assets/craftsuite-256.png")).unwrap_or_default();
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -329,7 +412,17 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
     let args = launch_args.args;
-    eframe::run_native("CraftSuite", options, Box::new(move |cc| Ok(Box::new(Picker::new(cc, args, error)))))
+    eframe::run_native(
+        "CraftSuite",
+        options,
+        Box::new(move |cc| {
+            let mut picker = Picker::new(cc, args, None);
+            if let Some(choice) = start_with {
+                picker.start(&cc.egui_ctx, choice);
+            }
+            Ok(Box::new(picker))
+        }),
+    )
 }
 
 #[cfg(test)]

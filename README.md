@@ -27,6 +27,7 @@ die als Patch-Dateien in `patches/` liegen und beim Bauen angewendet werden:
 
 | Patch | Was er ändert |
 |---|---|
+| `patches/effectcraft/0001-…` | Ein Video, das länger als die Komposition ist, verlängert die Komposition (und den Arbeitsbereich) auf die ganze Cliplänge, statt am alten Ende abgeschnitten zu werden. |
 | `patches/filmcraft/0001-…` | Nach dem Export erscheint „Export abgeschlossen“ mit dem Speicherort und „Im Ordner zeigen“ (vorher gab es nur einen kleinen Fortschrittsbalken, der wortlos verschwand). Standard-Speicherort unter Windows ist der Videos-Ordner statt des Benutzerordners. |
 
 ## Installieren (Windows)
@@ -41,6 +42,14 @@ die als Patch-Dateien in `patches/` liegen und beim Bauen angewendet werden:
    sind nicht digital signiert).
 
 Alternativ gibt es eine **Portable-Version** zum Entpacken und Starten, ganz ohne Installation.
+
+## Zuverlässiger Start
+
+Manche Grafiktreiber lassen FilmCraft und EffectCraft beim Öffnen des Fensters abstürzen (beide Projekte
+beschreiben das). Deshalb bleibt das Startfenster offen, bis die App wirklich steht („… wird gestartet“).
+Stürzt sie beim Start ab, startet CraftSuite sie automatisch neu, der Reihe nach mit DirectX 12, Vulkan
+und OpenGL, und merkt sich den Grafikmodus, der funktioniert hat (`%APPDATA%\CraftSuite\start.txt`).
+Klappt keiner, zeigt das Startfenster, was passiert ist.
 
 ## Bedienung
 

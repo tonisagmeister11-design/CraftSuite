@@ -1,0 +1,39 @@
+EffectCraft: Videos, die länger als die Komposition sind, verlängern die Komposition (und den
+Arbeitsbereich) auf die ganze Cliplänge, statt die Ebene am alten Ende abzuschneiden.
+
+diff --git a/crates/engine/src/commands/layer.rs b/crates/engine/src/commands/layer.rs
+index 09bad38..b4ec27c 100644
+--- a/crates/engine/src/commands/layer.rs
++++ b/crates/engine/src/commands/layer.rs
+@@ -291,11 +291,30 @@ fn add_item(s: &mut Session, p: &Value) -> Result<Value> {
+     // Settings ▸ General ▸ Create Layers at Composition Start Time (off: at the current time).
+     let default_start = if s.prefs.general.create_layers_at_comp_start || s.active_comp_id() != Some(cid) { Tick::ZERO } else { s.time() };
+     let start = fr.snap_nearest(f_p(p, "time").map(Tick::from_seconds_f64).unwrap_or(default_start));
++    // Video and audio longer than the composition: lengthen the composition (and a work area
++    // that reached its end) to the whole clip instead of cutting the layer off at the old end.
++    let is_moving_footage = matches!(&it.kind, ItemKind::Footage(f) if f.kind != effectcraft_project::FootageKind::Still);
++    let mut comp_end = comp.duration;
++    if is_moving_footage && let Some(d) = dur {
++        let mut end = fr.snap_nearest(start + d);
++        if end < start + d {
++            end = end + fr.frame_duration();
++        }
++        comp_end = comp_end.max(end);
++    }
+     let id = s.edit("Add Footage to Comp", None, |proj, st| {
++        if comp_end > comp.duration
++            && let Some(c) = proj.comp_mut(cid)
++        {
++            if c.work_area.1 >= c.duration {
++                c.work_area.1 = comp_end;
++            }
++            c.duration = comp_end;
++        }
+         let mut l = build::layer(proj, &comp, &it.name, src, size, dur);
+         l.start_time = start;
+         l.in_point = start;
+-        l.out_point = fr.snap_nearest((start + dur.unwrap_or(comp.duration)).min(comp.duration)).max(start + fr.frame_duration());
++        l.out_point = fr.snap_nearest((start + dur.unwrap_or(comp.duration)).min(comp_end)).max(start + fr.frame_duration());
+         place(&mut l, position);
+         insert_layer_at(proj, st, cid, l, index)
+     })?;

@@ -55,9 +55,11 @@ jobs:
         with:
           workspaces: vendor/${{ matrix.app }} -> target
           key: web-${{ matrix.app }}
-      - name: Tools (wasm-bindgen, wasm-opt)
+      # No wasm-opt, like the apps' own release builds: Ubuntu's binaryen is too old and breaks
+      # the wasm-bindgen output ("WebAssembly.Table.grow(): failed to grow table").
+      - name: Tools (wasm-bindgen)
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq binaryen
+          if command -v wasm-opt >/dev/null; then sudo rm -f "$(command -v wasm-opt)"; fi
           if ! wasm-bindgen --version 2>/dev/null | grep -q "$WASM_BINDGEN"; then
             cargo install wasm-bindgen-cli --version "$WASM_BINDGEN" --locked
           fi

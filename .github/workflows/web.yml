@@ -1,0 +1,113 @@
+name: Web
+
+# Builds the browser versions of FilmCraft and EffectCraft (WebAssembly, from the pinned
+# submodules plus patches/) and publishes them with the start page on GitHub Pages:
+#   https://<owner>.github.io/CraftSuite/             start page
+#   https://<owner>.github.io/CraftSuite/filmcraft/   FilmCraft
+#   https://<owner>.github.io/CraftSuite/effectcraft/ EffectCraft
+# Needs Settings ▸ Pages ▸ Source: "GitHub Actions" (once).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  WASM_BINDGEN: 0.2.129
+
+jobs:
+  app:
+    name: Build ${{ matrix.app }} (web)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [filmcraft, effectcraft]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out ${{ matrix.app }}
+        run: git submodule update --init --depth 1 "vendor/${{ matrix.app }}"
+      - name: Apply patches
+        run: |
+          shopt -s nullglob
+          for p in patches/${{ matrix.app }}/*.patch; do
+            echo "applying $p"
+            git -C "vendor/${{ matrix.app }}" apply --whitespace=nowarn "$GITHUB_WORKSPACE/$p"
+          done
+      - if: matrix.app == 'filmcraft'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: storytold/craft-fonts
+          ref: abb83316d96aa59c1cf64784289e378fe9fa5695
+          path: craft-fonts
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: vendor/${{ matrix.app }} -> target
+          key: web-${{ matrix.app }}
+      - name: Tools (wasm-bindgen, wasm-opt)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq binaryen
+          if ! wasm-bindgen --version 2>/dev/null | grep -q "$WASM_BINDGEN"; then
+            cargo install wasm-bindgen-cli --version "$WASM_BINDGEN" --locked
+          fi
+      - name: Build
+        working-directory: vendor/${{ matrix.app }}
+        run: |
+          if [ "${{ matrix.app }}" = filmcraft ]; then
+            export CRAFT_FONTS_DIR="$GITHUB_WORKSPACE/craft-fonts"
+          fi
+          cargo xtask web
+          ls -la target/web/dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-${{ matrix.app }}
+          path: vendor/${{ matrix.app }}/target/web/dist
+          if-no-files-found: error
+
+  deploy:
+    name: Publish on GitHub Pages
+    needs: app
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+          fetch-depth: 1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: web-filmcraft
+          path: site/filmcraft
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: web-effectcraft
+          path: site/effectcraft
+      - name: Start page
+        run: |
+          version() { sed -n '/^\[workspace.package\]/,/^\[/{s/^version = "\(.*\)"/\1/p}' "vendor/$1/Cargo.toml" | head -1; }
+          sed -e "s/__FILMCRAFT_VERSION__/$(version filmcraft)/" -e "s/__EFFECTCRAFT_VERSION__/$(version effectcraft)/" web/index.html > site/index.html
+          cp assets/craftsuite-256.png assets/filmcraft.png assets/effectcraft.png site/
+          touch site/.nojekyll
+          du -sh site/*
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

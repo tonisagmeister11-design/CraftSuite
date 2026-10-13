@@ -30,6 +30,17 @@ die als Patch-Dateien in `patches/` liegen und beim Bauen angewendet werden:
 | `patches/effectcraft/0001-…` | Ein Video, das länger als die Komposition ist, verlängert die Komposition (und den Arbeitsbereich) auf die ganze Cliplänge, statt am alten Ende abgeschnitten zu werden. |
 | `patches/filmcraft/0001-…` | Nach dem Export erscheint „Export abgeschlossen“ mit dem Speicherort und „Im Ordner zeigen“ (vorher gab es nur einen kleinen Fortschrittsbalken, der wortlos verschwand). Standard-Speicherort unter Windows ist der Videos-Ordner statt des Benutzerordners. |
 
+## Im Browser (ohne Installation)
+
+**https://tonisagmeister11-design.github.io/CraftSuite/** öffnen, App anklicken, fertig.
+
+Es sind dieselben Apps, als WebAssembly im Browser (am besten Chrome oder Edge, wegen WebGPU), mit den
+Verbesserungen aus `patches/`. Videos werden nicht hochgeladen, alles bleibt im Browser und auf dem PC;
+Exporte landen als Download. Im Browser fehlt nur, was dort technisch nicht geht (in FilmCraft z. B.
+Render-Vorschauen und Proxys, in EffectCraft die installierten Systemschriften), und große Projekte
+laufen auf dem Desktop schneller. Gebaut und veröffentlicht wird das von `.github/workflows/web.yml`
+(GitHub Pages); die Startseite ist `web/index.html`.
+
 ## Installieren (Windows)
 
 1. Unter [Releases](../../releases) (oder im letzten Lauf unter [Actions](../../actions) bei
@@ -81,6 +92,7 @@ Im Repository:
 | `vendor/filmcraft` | FilmCraft als Git-Submodul, festgelegt auf `v0.6.0` |
 | `vendor/effectcraft` | EffectCraft als Git-Submodul, festgelegt auf `v0.8.0` |
 | `patches/` | kleine Verbesserungen an den Apps, beim Bauen angewendet |
+| `web/index.html` | die Startseite der Browser-Version |
 | `installer/CraftSuite.iss` | der Installer (Inno Setup, pro Benutzer, ohne Admin) |
 | `packaging/assemble.sh` | baut den fertigen Ordner aus den drei Programmen zusammen |
 | `.github/workflows/windows.yml` | baut alles für Windows und erstellt das ZIP |

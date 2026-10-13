@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CraftSuite</title>
+  <meta name="description" content="FilmCraft und EffectCraft im Browser: Videoschnitt wie in Premiere Pro und Motion Graphics wie in After Effects.">
+  <link rel="icon" type="image/png" href="craftsuite-256.png">
+  <style>
+    :root {
+      --bg: #15131b;
+      --card: #211e2a;
+      --card-hover: #2a2636;
+      --line: rgba(255, 255, 255, 0.08);
+      --text: #eeeaf6;
+      --muted: #9a94ab;
+      --film: #8b5cf6;
+      --effect: #e03c9a;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px 28px;
+    }
+    header { text-align: center; margin-bottom: 32px; }
+    header img { width: 72px; height: 72px; }
+    h1 { font-size: 32px; font-weight: 600; margin: 10px 0 6px; }
+    header p { color: var(--muted); margin: 0; font-size: 15px; }
+    main {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 340px));
+      gap: 28px;
+      width: 100%;
+      justify-content: center;
+    }
+    a.card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 30px 24px 26px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      color: inherit;
+      text-decoration: none;
+      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    a.card:hover, a.card:focus-visible {
+      transform: translateY(-4px);
+      background: var(--card-hover);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1.5px var(--accent);
+      outline: none;
+    }
+    a.card.film { --accent: var(--film); }
+    a.card.effect { --accent: var(--effect); }
+    .card img { width: 128px; height: 128px; border-radius: 24px; }
+    .card h2 { font-size: 26px; font-weight: 500; margin: 20px 0 6px; }
+    .card .tag { color: var(--accent); font-size: 15px; margin-bottom: 14px; }
+    .card ul { list-style: none; margin: 0 0 20px; padding: 0; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
+    .card .open {
+      margin-top: auto;
+      padding: 9px 22px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .key, .version {
+      position: absolute;
+      top: 14px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .key {
+      left: 14px;
+      width: 24px; height: 24px;
+      display: grid; place-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      font-family: ui-monospace, Consolas, monospace;
+    }
+    .version { right: 16px; top: 18px; }
+    .notes {
+      max-width: 708px;
+      width: 100%;
+      margin-top: 30px;
+      padding: 16px 20px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      color: var(--muted);
+      font-size: 13.5px;
+      line-height: 1.6;
+    }
+    .notes strong { color: var(--text); font-weight: 600; }
+    .notes ul { margin: 6px 0 0; padding-left: 18px; }
+    #browser-warning {
+      display: none;
+      max-width: 708px;
+      width: 100%;
+      margin-bottom: 22px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: rgba(255, 193, 7, 0.12);
+      border: 1px solid rgba(255, 193, 7, 0.35);
+      color: #ffd666;
+      font-size: 14px;
+    }
+    footer { margin-top: 26px; color: var(--muted); font-size: 12px; text-align: center; line-height: 1.6; }
+    footer a { color: var(--muted); }
+    @media (max-width: 760px) {
+      main { grid-template-columns: minmax(0, 420px); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="craftsuite-256.png" alt="">
+    <h1>CraftSuite</h1>
+    <p>Welche App möchtest du öffnen?</p>
+  </header>
+
+  <div id="browser-warning" role="status"></div>
+
+  <main>
+    <a class="card film" href="filmcraft/" id="film">
+      <span class="key">1</span><span class="version">v__FILMCRAFT_VERSION__</span>
+      <img src="filmcraft.png" alt="">
+      <h2>FilmCraft</h2>
+      <div class="tag">Videoschnitt, Farbe und Ton</div>
+      <ul>
+        <li>Schnitt wie in Premiere Pro</li>
+        <li>Lumetri-Farbkorrektur und Übergänge</li>
+        <li>Audio-Mixer und Untertitel</li>
+      </ul>
+      <span class="open">Im Browser öffnen</span>
+    </a>
+    <a class="card effect" href="effectcraft/" id="effect">
+      <span class="key">2</span><span class="version">v__EFFECTCRAFT_VERSION__</span>
+      <img src="effectcraft.png" alt="">
+      <h2>EffectCraft</h2>
+      <div class="tag">Motion Graphics und visuelle Effekte</div>
+      <ul>
+        <li>Kompositionen wie in After Effects</li>
+        <li>306 Effekte und Expressions</li>
+        <li>3D-Kameras und Lichter</li>
+      </ul>
+      <span class="open">Im Browser öffnen</span>
+    </a>
+  </main>
+
+  <section class="notes">
+    <strong>Gut zu wissen</strong>
+    <ul>
+      <li>Läuft am besten in <strong>Chrome oder Edge</strong> (WebGPU). Der erste Start lädt einmalig die App (einige MB) und dauert etwas.</li>
+      <li>Deine Videos werden <strong>nicht hochgeladen</strong>: Alles bleibt im Browser und auf deinem PC. Exportierte Videos landen als <strong>Download</strong>.</li>
+      <li>Es ist dieselbe App wie auf dem Desktop. Im Browser fehlt aber, was dort nicht geht: In FilmCraft z. B. Render-Vorschauen und Proxys, in EffectCraft die installierten Systemschriften. Für große Projekte ist die Desktop-Version schneller.</li>
+    </ul>
+  </section>
+
+  <footer>
+    FilmCraft und EffectCraft: © ArtCraft-Team und Mitwirkende, MIT OR Apache-2.0 ·
+    <a href="https://github.com/storytold/filmcraft">FilmCraft</a> ·
+    <a href="https://github.com/storytold/effectcraft">EffectCraft</a><br>
+    CraftSuite ist ein unabhängiges Projekt und nicht mit ArtCraft oder Adobe verbunden.
+    Premiere Pro und After Effects sind Marken von Adobe Inc.
+  </footer>
+
+  <script>
+    // Keys 1 and 2 open the apps, like in the desktop start window.
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "1") location.href = "filmcraft/";
+      if (e.key === "2") location.href = "effectcraft/";
+    });
+    // Without WebGPU the apps fall back to WebGL2 (slower); say so up front.
+    if (!("gpu" in navigator)) {
+      const w = document.getElementById("browser-warning");
+      w.textContent = "Dein Browser unterstützt kein WebGPU. Die Apps laufen trotzdem (mit WebGL2), aber langsamer. Am besten in Chrome oder Edge öffnen.";
+      w.style.display = "block";
+    }
+  </script>
+</body>
+</html>

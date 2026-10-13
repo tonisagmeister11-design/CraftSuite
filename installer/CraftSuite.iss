@@ -53,6 +53,13 @@ Name: "{autoprograms}\CraftSuite\FilmCraft"; Filename: "{app}\FilmCraft\filmcraf
 Name: "{autoprograms}\CraftSuite\EffectCraft"; Filename: "{app}\EffectCraft\effectcraft.exe"; WorkingDir: "{app}\EffectCraft"
 Name: "{autodesktop}\CraftSuite"; Filename: "{app}\CraftSuite.exe"; Tasks: desktopicon
 
+; The browser version (GitHub Pages, .github/workflows/web.yml).
+[INI]
+Filename: "{autoprograms}\CraftSuite\CraftSuite im Browser.url"; Section: "InternetShortcut"; Key: "URL"; String: "https://tonisagmeister11-design.github.io/CraftSuite/"
+
+[UninstallDelete]
+Type: files; Name: "{autoprograms}\CraftSuite\CraftSuite im Browser.url"
+
 ; Per-user file associations (HKCU, no admin): CraftSuite picks the right app from the extension.
 [Registry]
 Root: HKCU; Subkey: "Software\Classes\CraftSuite.Project"; ValueType: string; ValueName: ""; ValueData: "CraftSuite-Projekt"; Flags: uninsdeletekey; Tasks: associate
